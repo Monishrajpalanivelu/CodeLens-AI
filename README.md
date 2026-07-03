@@ -335,8 +335,3 @@ This project is open-source and available for educational and personal use.
 
 ---
 
-<div align="center">
-
-**Built with ❤️ by [Monishraj](https://github.com/Monishrajpalanivelu)**
-
-</div>
