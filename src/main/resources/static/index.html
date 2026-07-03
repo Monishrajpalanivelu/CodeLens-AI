@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CodeLens AI - Semantic Code Graph Engine</title>
+    <!-- Outfit Font -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Vis.js styles for network graph -->
+    <link rel="stylesheet" href="https://unpkg.com/vis-network/styles/vis-network.min.css">
+    <!-- Prism.js Tomorrow Night theme -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/line-numbers/prism-line-numbers.min.css">
+    <!-- Custom styling -->
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+    <!-- Notification Toast -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <!-- Header (Hidden on auth page) -->
+    <header id="main-header" class="main-header hidden">
+        <div class="header-container">
+            <div class="logo">
+                <i class="fa-solid fa-cube logo-icon"></i>
+                <span>CodeLens<span class="logo-accent">AI</span></span>
+            </div>
+            <nav class="nav-links">
+                <span id="user-display" class="user-display">
+                    <i class="fa-regular fa-user"></i> <span id="username-placeholder">User</span>
+                </span>
+                <button id="btn-logout" class="btn btn-secondary btn-sm">
+                    <i class="fa-solid fa-right-from-bracket"></i> Logout
+                </button>
+            </nav>
+        </div>
+    </header>
+
+    <!-- App Container -->
+    <main class="app-container">
+
+        <!-- 1. Authentication View -->
+        <section id="auth-view" class="view auth-view">
+            <div class="auth-card glass">
+                <div class="auth-header">
+                    <i class="fa-solid fa-cube auth-logo"></i>
+                    <h2>CodeLens<span class="logo-accent">AI</span></h2>
+                    <p class="auth-subtitle">Semantic Graph Analysis for Java Repositories</p>
+                </div>
+
+                <!-- Login Form -->
+                <div id="login-container">
+                    <form id="form-login" class="auth-form">
+                        <div class="form-group">
+                            <label for="login-username"><i class="fa-solid fa-user"></i> Username</label>
+                            <input type="text" id="login-username" required placeholder="Enter username">
+                        </div>
+                        <div class="form-group">
+                            <label for="login-password"><i class="fa-solid fa-lock"></i> Password</label>
+                            <input type="password" id="login-password" required placeholder="Enter password">
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-block">
+                            <span>Sign In</span> <i class="fa-solid fa-arrow-right-to-bracket"></i>
+                        </button>
+                    </form>
+                    <p class="auth-toggle">Don't have an account? <span id="toggle-to-register">Register here</span></p>
+                </div>
+
+                <!-- Register Form -->
+                <div id="register-container" class="hidden">
+                    <form id="form-register" class="auth-form">
+                        <div class="form-group">
+                            <label for="reg-username"><i class="fa-solid fa-user"></i> Username</label>
+                            <input type="text" id="reg-username" required placeholder="Min 3 characters">
+                        </div>
+                        <div class="form-group">
+                            <label for="reg-email"><i class="fa-solid fa-envelope"></i> Email</label>
+                            <input type="email" id="reg-email" required placeholder="email@example.com">
+                        </div>
+                        <div class="form-group">
+                            <label for="reg-password"><i class="fa-solid fa-lock"></i> Password</label>
+                            <input type="password" id="reg-password" required placeholder="Min 6 characters">
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-block">
+                            <span>Register Account</span> <i class="fa-solid fa-user-plus"></i>
+                        </button>
+                    </form>
+                    <p class="auth-toggle">Already have an account? <span id="toggle-to-login">Login here</span></p>
+                </div>
+            </div>
+        </section>
+
+        <!-- 2. Dashboard View -->
+        <section id="dashboard-view" class="view dashboard-view hidden">
+            <!-- Summary Metrics Cards -->
+            <div class="metrics-grid">
+                <div class="metric-card glass">
+                    <div class="metric-icon purple"><i class="fa-solid fa-folder-tree"></i></div>
+                    <div class="metric-info">
+                        <h3>Repositories</h3>
+                        <p id="metric-repos-count">0</p>
+                    </div>
+                </div>
+                <div class="metric-card glass">
+                    <div class="metric-icon blue"><i class="fa-solid fa-database"></i></div>
+                    <div class="metric-info">
+                        <h3>Connected Database</h3>
+                        <p>PostgreSQL</p>
+                    </div>
+                </div>
+                <div class="metric-card glass">
+                    <div class="metric-icon cyan"><i class="fa-solid fa-microchip"></i></div>
+                    <div class="metric-info">
+                        <h3>Vector Engine</h3>
+                        <p>Spring AI + pgvector</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Actions Grid -->
+            <div class="dashboard-grid">
+                <!-- Add Repository Card -->
+                <div class="action-card glass add-repo-card">
+                    <h2><i class="fa-solid fa-plus-circle purple-text"></i> Register Repository</h2>
+                    <p class="section-desc">Submit a public GitHub Java Repository URL to begin parsing, AST generation, and semantic embedding.</p>
+                    
+                    <form id="form-add-repo" class="add-repo-form">
+                        <div class="form-input-group">
+                            <i class="fa-brands fa-github input-icon"></i>
+                            <input type="url" id="repo-url" required placeholder="https://github.com/owner/repository" pattern="https://github.com/.*">
+                        </div>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fa-solid fa-bolt"></i> Start Indexing
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Repositories List Card -->
+                <div class="action-card glass repos-list-card">
+                    <h2><i class="fa-solid fa-table-list blue-text"></i> Managed Repositories</h2>
+                    <p class="section-desc">List of all indexed codebases. You can inspect details, run queries, or view their dependency networks.</p>
+
+                    <div class="table-container">
+                        <table id="table-repos">
+                            <thead>
+                                <tr>
+                                    <th>Repository Name</th>
+                                    <th>GitHub Link</th>
+                                    <th>Status</th>
+                                    <th>Last Indexed</th>
+                                    <th class="text-right">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="repos-table-body">
+                                <tr>
+                                    <td colspan="5" class="text-center text-muted py-4">No repositories registered yet. Try adding one above!</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 3. Repository Detail View -->
+        <section id="repo-view" class="view repo-view hidden">
+            <!-- Back & Header -->
+            <div class="detail-header-panel">
+                <button id="btn-back-dashboard" class="btn btn-secondary btn-sm">
+                    <i class="fa-solid fa-arrow-left"></i> Dashboard
+                </button>
+                <div class="repo-details">
+                    <h1 id="repo-title">repository-name</h1>
+                    <a id="repo-github-link" href="#" target="_blank" class="repo-link">
+                        <i class="fa-brands fa-github"></i> <span id="repo-github-url-text">url</span>
+                    </a>
+                </div>
+                <div id="repo-status-badge" class="badge">PENDING</div>
+            </div>
+
+            <!-- Polling Overlay if indexing -->
+            <div id="indexing-overlay" class="indexing-overlay glass hidden">
+                <div class="spinner-container">
+                    <div class="spinner"></div>
+                    <h2>Indexing Codebase...</h2>
+                    <p>Fetching files, parsing Abstract Syntax Trees, generating embeddings, and building dependency edges. This may take a moment depending on size.</p>
+                    <div class="indexing-status-live">Status: <span id="indexing-live-status">INDEXING</span></div>
+                </div>
+            </div>
+
+            <!-- Details Content Grid -->
+            <div class="detail-tabs-container glass">
+                <!-- Tab Controls -->
+                <div class="tab-controls">
+                    <button class="tab-btn active" data-tab="tab-search">
+                        <i class="fa-solid fa-magnifying-glass"></i> Semantic Code Search
+                    </button>
+                    <button class="tab-btn" data-tab="tab-graph" id="btn-tab-graph">
+                        <i class="fa-solid fa-circle-nodes"></i> Interactive Dependency Graph
+                    </button>
+                </div>
+
+                <!-- Tab 1: Semantic Search -->
+                <div id="tab-search" class="tab-content active">
+                    <div class="search-bar-panel">
+                        <form id="form-search" class="search-form">
+                            <div class="search-input-group">
+                                <i class="fa-solid fa-search search-icon"></i>
+                                <input type="text" id="search-query" required placeholder="Ask semantic questions (e.g. 'Where is the JWT token generated?' or 'How are users saved in database?')">
+                            </div>
+                            <div class="search-options">
+                                <label for="search-top-k">Results Limit (K):</label>
+                                <select id="search-top-k">
+                                    <option value="5">5</option>
+                                    <option value="10" selected>10</option>
+                                    <option value="20">20</option>
+                                    <option value="30">30</option>
+                                </select>
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fa-solid fa-magnifying-glass"></i> Search
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <!-- Search Results -->
+                    <div class="search-results-panel">
+                        <div class="results-header hidden" id="results-count-header">
+                            Found <span id="results-count" class="accent-text">0</span> matching code segments:
+                        </div>
+                        <div id="search-results-list" class="search-results-list">
+                            <!-- Placeholder -->
+                            <div class="no-search text-center text-muted">
+                                <i class="fa-regular fa-lightbulb big-icon"></i>
+                                <p>Enter a query above to run a semantic search. The engine will match your natural language description against code embeddings using pgvector.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tab 2: Graph Visualization -->
+                <div id="tab-graph" class="tab-content">
+                    <div class="graph-layout">
+                        <div class="graph-legend glass">
+                            <h4>Graph Legend</h4>
+                            <div class="legend-item"><span class="legend-dot class-dot"></span> Class</div>
+                            <div class="legend-item"><span class="legend-dot method-dot"></span> Method / Function</div>
+                            <div class="legend-item" style="color: rgba(6, 214, 160, 0.95);"><i class="fa-solid fa-arrow-right"></i> Method Call (CALLS)</div>
+                            <div class="legend-item" style="color: rgba(157, 78, 221, 0.95);"><span style="border: 1px dashed rgba(157, 78, 221, 0.95); width: 14px; height: 0; display: inline-block; vertical-align: middle; margin-right: 6px;"></span> Class Containment</div>
+                            <div class="legend-item" style="color: rgba(58, 134, 200, 0.95);"><i class="fa-solid fa-arrow-right"></i> Class Dependency</div>
+                            <div class="legend-item" style="margin-top: 1rem; border-top: 1px dashed var(--panel-border); padding-top: 0.75rem;">
+                                <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; color: var(--text-primary);">
+                                    <input type="checkbox" id="toggle-isolated-nodes" checked style="cursor: pointer;">
+                                    Hide Isolated Nodes
+                                </label>
+                            </div>
+                            <p class="legend-tip"><i class="fa-solid fa-info-circle"></i> Drag nodes to organize, zoom to inspect details, and double-click nodes to view source code.</p>
+                        </div>
+                        <div id="graph-canvas-container" class="graph-canvas-container">
+                            <div id="graph-canvas"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Code Viewer Modal -->
+    <div id="code-modal" class="modal hidden">
+        <div class="modal-content glass">
+            <div class="modal-header">
+                <div class="modal-title-info">
+                    <span id="modal-entity-type" class="badge badge-outline">ENTITY_TYPE</span>
+                    <h3 id="modal-entity-name">entity_name</h3>
+                </div>
+                <button id="modal-close" class="modal-close-btn">&times;</button>
+            </div>
+            <div class="modal-meta">
+                <i class="fa-regular fa-file-code"></i> File: <span id="modal-file-path" class="accent-text">path/to/file</span>
+                <span class="modal-lines"><i class="fa-solid fa-list-ol"></i> Lines: <span id="modal-start-line">1</span> - <span id="modal-end-line">100</span></span>
+            </div>
+            <div class="modal-body">
+                <pre class="line-numbers"><code id="modal-code-block" class="language-java"></code></pre>
+            </div>
+        </div>
+    </div>
+
+    <!-- Vis.js network graph library -->
+    <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+    <!-- Prism.js for syntax highlighting -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-java.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/line-numbers/prism-line-numbers.min.js"></script>
+    <!-- Core Application Logic -->
+    <script src="js/app.js"></script>
+</body>
+</html>
