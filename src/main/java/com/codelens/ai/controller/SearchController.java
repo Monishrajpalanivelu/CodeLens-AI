@@ -22,7 +22,8 @@ public class SearchController {
             @RequestParam(defaultValue = "10") int topK) {
 
         // Hard cap — prevent abuse / massive vector queries
-        if (topK > 50) topK = 50;
+        if (topK > 50)
+            topK = 50;
 
         return ResponseEntity.ok(
                 searchService.search(repoId, q, topK));

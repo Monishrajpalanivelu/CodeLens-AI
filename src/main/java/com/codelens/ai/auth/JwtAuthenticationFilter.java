@@ -16,17 +16,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.IOException;
 
 /**
- * Runs once per HTTP request — intercepts every request before
- * it reaches any controller.
- *
- * Flow:
- * 1. Extract "Authorization: Bearer <token>" header
- * 2. Parse the username out of the token
- * 3. Load the User from DB
- * 4. Validate the token
- * 5. If valid — set authentication in SecurityContext
- *    (Spring Security then allows the request through)
- * 6. If invalid/missing — do nothing (Spring Security blocks it)
+ * JWT Authentication Filter that intercepts requests to validate JWT tokens.
  */
 @Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
@@ -46,54 +36,38 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                                     FilterChain filterChain)
             throws ServletException, IOException {
 
-        // Step 1: Get the Authorization header
         String authHeader = request.getHeader("Authorization");
 
-        // If no Bearer token present — skip filter, let Spring Security
-        // decide (it will block if the endpoint requires auth)
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             filterChain.doFilter(request, response);
             return;
         }
 
-        // Step 2: Extract token (remove "Bearer " prefix)
         String token = authHeader.substring(7);
 
         try {
-            // Step 3: Parse username from token
             String username = jwtService.extractUsername(token);
 
-            // Only proceed if username found AND not already authenticated
-            if (username != null &&
-                    SecurityContextHolder.getContext()
-                            .getAuthentication() == null) {
+            if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+                if (jwtService.isTokenValid(token, username)) {
+                    UserDetails userDetails = org.springframework.security.core.userdetails.User
+                            .withUsername(username)
+                            .password("")
+                            .authorities("ROLE_USER")
+                            .build();
 
-                // Step 4: Load user from DB
-                UserDetails userDetails =
-                        userDetailsService.loadUserByUsername(username);
-
-                // Step 5: Validate token against this user
-                if (jwtService.isTokenValid(token, userDetails.getUsername())) {
-
-                    // Step 6: Create authentication token and set in context
-                    // This is what tells Spring Security "this request is authenticated"
                     UsernamePasswordAuthenticationToken authToken =
                             new UsernamePasswordAuthenticationToken(
                                     userDetails,
-                                    null, // credentials null — we use JWT not password
+                                    null,
                                     userDetails.getAuthorities()
                             );
-                    authToken.setDetails(
-                            new WebAuthenticationDetailsSource()
-                                    .buildDetails(request));
+                    authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
 
-                    SecurityContextHolder.getContext()
-                            .setAuthentication(authToken);
+                    SecurityContextHolder.getContext().setAuthentication(authToken);
                 }
             }
         } catch (Exception e) {
-            // Invalid token — log and continue without authenticating
-            // Spring Security will block if the endpoint requires auth
             logger.warn("JWT validation failed: " + e.getMessage());
         }
 

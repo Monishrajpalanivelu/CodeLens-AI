@@ -690,7 +690,94 @@ function drawGraph() {
             openCodeViewerModal(nodeId);
         }
     });
+
+    // Single-click on any node to run Impact Analysis
+    state.graphNetwork.on('selectNode', async function(params) {
+        if (params.nodes.length > 0) {
+            const nodeId = params.nodes[0];
+            await runImpactAnalysis(nodeId);
+        }
+    });
+
+    // Deselect resets the graph colors
+    state.graphNetwork.on('deselectNode', function(params) {
+        resetGraphColors();
+    });
 }
+
+// ==========================================================================
+// Impact Analysis Implementation
+// ==========================================================================
+async function runImpactAnalysis(nodeId) {
+    if (!state.currentRepo || !state.graphNetwork) return;
+
+    try {
+        const impactData = await apiRequest(`/impact/${nodeId}?repoId=${state.currentRepo.id}&maxDepth=10`);
+        if (!impactData || !impactData.affectedEntities) return;
+
+        const affectedIds = new Set(impactData.affectedEntities.map(e => e.id));
+        
+        // Update nodes visually
+        const updatedNodes = state.currentGraphData.nodes.map(node => {
+            const isSelected = node.id === nodeId;
+            const isAffected = affectedIds.has(node.id) && !isSelected;
+            
+            let colorConfig;
+            
+            if (isSelected) {
+                // Red for the deleted/selected node
+                colorConfig = {
+                    background: '#ef4444', 
+                    border: '#b91c1c'
+                };
+            } else if (isAffected) {
+                // Orange for affected nodes
+                colorConfig = {
+                    background: '#f97316',
+                    border: '#c2410c'
+                };
+            } else {
+                // Grey out unaffected nodes
+                colorConfig = {
+                    background: '#475569',
+                    border: '#334155'
+                };
+            }
+
+            return {
+                id: node.id,
+                color: colorConfig
+            };
+        });
+
+        // Apply visual updates via dataset
+        state.graphNetwork.body.data.nodes.update(updatedNodes);
+        
+        showToast(`Impact Analysis: Deleting this affects ${impactData.totalAffected} other entities.`, 'info');
+
+    } catch (e) {
+        showToast('Failed to run impact analysis.', 'error');
+    }
+}
+
+function resetGraphColors() {
+    if (!state.currentGraphData || !state.graphNetwork) return;
+
+    // Reset to default colors based on node type
+    const resetNodes = state.currentGraphData.nodes.map(node => {
+        const isClass = node.type === 'CLASS';
+        return {
+            id: node.id,
+            color: {
+                background: isClass ? '#9d4edd' : '#06d6a0',
+                border: isClass ? '#7b2cbf' : '#04a777'
+            }
+        };
+    });
+
+    state.graphNetwork.body.data.nodes.update(resetNodes);
+}
+
 
 // ==========================================================================
 // Code Viewer Modal Implementation

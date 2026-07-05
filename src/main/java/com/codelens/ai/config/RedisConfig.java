@@ -31,7 +31,7 @@ public class RedisConfig {
     public CacheManager cacheManager(RedisConnectionFactory connectionFactory) {
         RedisCacheConfiguration config = RedisCacheConfiguration
                 .defaultCacheConfig()
-                // Cache entries expire after 1 hour automatically
+                // Cache enptries exire after 1 hour automatically
                 .entryTtl(Duration.ofHours(1))
                 // Store keys as plain strings (readable in Redis CLI)
                 .serializeKeysWith(

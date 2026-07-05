@@ -42,7 +42,7 @@ public class IndexingService {
     // call this.indexFileSafely() directly, you bypass the proxy and the
     // transaction annotation is silently ignored. Injecting self and calling
     // self.indexFileSafely() goes through the proxy correctly.
-    // (Bug 2 + Bug 10 fix from blueprint)
+
     @Autowired
     @Lazy
     private IndexingService self;
@@ -66,20 +66,13 @@ public class IndexingService {
         try {
             repoRepository.updateStatus(repoId, "INDEXING");
 
-            List<GitHubService.FileContent> files =
-                    gitHubService.fetchJavaFiles(githubUrl);
+            List<GitHubService.FileContent> files = gitHubService.fetchJavaFiles(githubUrl);
 
             log.info("Fetched {} Java files for repo {}", files.size(), repoId);
 
-            // Bug 3 fix: each file gets its own @Transactional scope via
-            // self.indexFileSafely(). If file 99 fails, files 1-98 are
-            // already committed — not rolled back.
-            // Bug 4 fix: files processed in parallel via CompletableFuture,
-            // not a sequential for-loop.
             List<CompletableFuture<Void>> futures = files.stream()
                     .map(file -> CompletableFuture.runAsync(
-                            () -> self.indexFileSafely(repoId, file)
-                    ))
+                            () -> self.indexFileSafely(repoId, file)))
                     .toList();
 
             // Wait for ALL files to finish before building dependency edges
@@ -117,23 +110,16 @@ public class IndexingService {
      * Run in its own transaction so failure here rolls back only this file's work.
      */
     @Transactional
-    @Retryable(
-            retryFor = Exception.class,
-            noRetryFor = com.codelens.ai.ai.GeminiEmbeddingService.GeminiClientException.class,
-            maxAttempts = 3,
-            backoff = @Backoff(delay = 1000, multiplier = 2.0)
-    )
+    @Retryable(retryFor = Exception.class, noRetryFor = com.codelens.ai.ai.GeminiEmbeddingService.GeminiClientException.class, maxAttempts = 3, backoff = @Backoff(delay = 1000, multiplier = 2.0))
     public void indexFileWithRetry(Long repoId, GitHubService.FileContent file) {
-        List<JavaAstService.ParsedEntity> parsed =
-                astService.extractEntities(file.content(), file.path());
+        List<JavaAstService.ParsedEntity> parsed = astService.extractEntities(file.content(), file.path());
 
         if (parsed.isEmpty()) {
             log.debug("No entities extracted from {}", file.path());
             return;
         }
 
-        com.codelens.ai.model.Repository repo =
-                repoRepository.getReferenceById(repoId);
+        com.codelens.ai.model.Repository repo = repoRepository.getReferenceById(repoId);
 
         for (JavaAstService.ParsedEntity p : parsed) {
             // Step 1: Save entity to code_entities (gets an ID assigned)
@@ -179,8 +165,7 @@ public class IndexingService {
      * would require the project's classpath. Documented trade-off.
      */
     @Transactional
-    @Retryable(retryFor = Exception.class, maxAttempts = 3,
-            backoff = @Backoff(delay = 1000, multiplier = 2.0))
+    @Retryable(retryFor = Exception.class, maxAttempts = 3, backoff = @Backoff(delay = 1000, multiplier = 2.0))
     public void buildDependencyEdges(Long repoId) {
         log.info("Building dependency edges for repo {}", repoId);
 
@@ -192,8 +177,7 @@ public class IndexingService {
                 .collect(Collectors.toMap(
                         CodeEntity::getName,
                         Function.identity(),
-                        (existing, replacement) -> existing
-                ));
+                        (existing, replacement) -> existing));
 
         List<Dependency> edges = new ArrayList<>();
 
@@ -203,8 +187,7 @@ public class IndexingService {
                 .collect(Collectors.toMap(
                         CodeEntity::getFilePath,
                         Function.identity(),
-                        (existing, replacement) -> existing
-                ));
+                        (existing, replacement) -> existing));
 
         // Group entities by filePath to construct CONTAINS edges (Class -> Method)
         java.util.Map<String, List<CodeEntity>> entitiesByFile = allEntities.stream()
@@ -212,13 +195,13 @@ public class IndexingService {
 
         for (java.util.Map.Entry<String, List<CodeEntity>> entry : entitiesByFile.entrySet()) {
             List<CodeEntity> fileEntities = entry.getValue();
-            
+
             // Find class entity in this file
             CodeEntity classEntity = fileEntities.stream()
                     .filter(entity -> entity.getEntityType() == CodeEntity.EntityType.CLASS)
                     .findFirst()
                     .orElse(null);
-                    
+
             if (classEntity != null) {
                 // Connect class to all its functions
                 for (CodeEntity f : fileEntities) {
@@ -238,8 +221,12 @@ public class IndexingService {
                 .filter(entity -> entity.getEntityType() == CodeEntity.EntityType.FUNCTION)
                 .toList()) {
 
-            CodeEntity fromEntity = nameToEntity.get(e.getName());
-            if (fromEntity == null) continue;
+            // Use e directly — it is already the exact entity from the loop.
+            // Previously this did nameToEntity.get(e.getName()) which returned
+            // the WRONG entity when two methods in different classes share the same name.
+            CodeEntity fromEntity = e;
+            if (fromEntity == null)
+                continue;
 
             List<String> calls = astService.extractCallsFromMethod(e.getSourceCode());
 
@@ -247,7 +234,7 @@ public class IndexingService {
                 CodeEntity toEntity = nameToEntity.get(calledName);
                 if (toEntity != null &&
                         !toEntity.getId().equals(fromEntity.getId())) {
-                    
+
                     // Method calls Method
                     edges.add(Dependency.builder()
                             .fromEntityId(fromEntity.getId())
@@ -311,13 +298,13 @@ public class IndexingService {
     @Transactional
     public void deleteRepository(Long repoId) {
         log.info("Deleting repository {}", repoId);
-        
+
         // 1. Clean up all indexed data (vector store, dependencies, entities)
         cleanRepositoryData(repoId);
-        
+
         // 2. Delete the repository record itself
         repoRepository.deleteById(repoId);
-        
+
         log.info("Repository {} fully deleted", repoId);
     }
 }

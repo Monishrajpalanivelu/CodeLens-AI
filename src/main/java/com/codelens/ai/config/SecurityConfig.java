@@ -37,17 +37,13 @@ public class SecurityConfig {
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         return http
                 .csrf(AbstractHttpConfigurer::disable)
-                // Bug 13 fix: CORS configuration was missing in original
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-                // Stateless — no sessions, JWT on every request
                 .sessionManagement(sm -> sm
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        // Public endpoints — no JWT needed
                         .requestMatchers("/", "/index.html", "/favicon.ico", "/css/**", "/js/**", "/error").permitAll()
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/actuator/health").permitAll()
-                        // Everything else requires a valid JWT
                         .anyRequest().authenticated()
                 )
                 // JWT filter runs before Spring's default username/password filter
@@ -57,9 +53,7 @@ public class SecurityConfig {
     }
 
     /**
-     * Loads users from our PostgreSQL users table.
-     * Spring Security calls this during authentication to get
-     * the stored password hash for comparison.
+     * Loads user from DB to provide UserDetails for authentication.
      */
     @Bean
     public UserDetailsService userDetailsService() {
@@ -90,9 +84,6 @@ public class SecurityConfig {
 
     @Bean
     public PasswordEncoder passwordEncoder() {
-        // BCrypt automatically salts and hashes passwords.
-        // Cost factor 10 = ~100ms per hash — slow enough to
-        // resist brute force, fast enough to not annoy users.
         return new BCryptPasswordEncoder();
     }
 

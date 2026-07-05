@@ -22,7 +22,7 @@ import java.util.Set;
  * In-memory traversal runs in microseconds.
  *
  * Why bounded LRU (max 10 repos)?
- * Bug 7 fix from blueprint — unbounded HashMap with
+ * unbounded HashMap with
  * 100k functions + 500k edges = several GB of RAM.
  * LRU evicts the least recently used repo when
  * the cache exceeds 10 entries.
@@ -46,21 +46,19 @@ public class DependencyGraph {
      * removeEldestEntry evicts when size exceeds 10.
      * synchronizedMap makes it thread-safe for concurrent requests.
      */
-    private final Map<Long, RepoGraph> cache =
-            Collections.synchronizedMap(
-                    new LinkedHashMap<>(16, 0.75f, true) {
-                        @Override
-                        protected boolean removeEldestEntry(
-                                Map.Entry<Long, RepoGraph> eldest) {
-                            boolean shouldEvict = size() > 10;
-                            if (shouldEvict) {
-                                log.debug("Evicting graph for repo {}",
-                                        eldest.getKey());
-                            }
-                            return shouldEvict;
-                        }
+    private final Map<Long, RepoGraph> cache = Collections.synchronizedMap(
+            new LinkedHashMap<>(16, 0.75f, true) {
+                @Override
+                protected boolean removeEldestEntry(
+                        Map.Entry<Long, RepoGraph> eldest) {
+                    boolean shouldEvict = size() > 10;
+                    if (shouldEvict) {
+                        log.debug("Evicting graph for repo {}",
+                                eldest.getKey());
                     }
-            );
+                    return shouldEvict;
+                }
+            });
 
     /**
      * Get the graph for a repo — loads from DB if not cached.
@@ -75,8 +73,7 @@ public class DependencyGraph {
             dependencyRepository.findByRepoId(id)
                     .forEach(dep -> graph.addEdge(
                             dep.getFromEntityId(),
-                            dep.getToEntityId()
-                    ));
+                            dep.getToEntityId()));
 
             log.info("Loaded graph for repo {}: {} edges",
                     id, graph.edgeCount());
@@ -96,8 +93,8 @@ public class DependencyGraph {
     /**
      * Bidirectional adjacency list for one repository.
      *
-     * forward: A → {B, C}  means "A calls B and C"
-     * reverse: B → {A}     means "A calls B" (B is called by A)
+     * forward: A → {B, C} means "A calls B and C"
+     * reverse: B → {A} means "A calls B" (B is called by A)
      *
      * BFS impact analysis uses the REVERSE graph:
      * "who calls X?" traverses reverse edges from X.
